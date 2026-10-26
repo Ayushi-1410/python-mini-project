@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard | Smart Care{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+    <section class="page-heading" aria-labelledby="page-title">
+        <div>
+            <p class="eyebrow">Overview <span class="eyebrow-dot"></span> Live queue</p>
+            <h1 id="page-title">Smart Care</h1>
+            <p class="intro">Emergency, urgent, and routine visits in one clear view.</p>
+        </div>
+        <a class="text-link" href="{{ url_for('home', department=department, search=search) }}">Refresh queue <span aria-hidden="true">↻</span></a>
+    </section>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+            <p class="notice notice-{{ category }}" role="status">{{ message }}</p>
+        {% endfor %}
+    {% endwith %}
+
+    <section class="metrics" aria-label="Queue summary">
+        <article class="metric metric-active">
+            <span class="metric-label">Active queue</span>
+            <strong>{{ counts.active }}</strong>
+            <span class="metric-note">Waiting or in consultation</span>
+        </article>
+        <article class="metric metric-waiting">
+            <span class="metric-label">Waiting</span>
+            <strong>{{ counts.waiting }}</strong>
+            <span class="metric-note">Awaiting consultation</span>
+        </article>
+        <article class="metric metric-emergency">
+            <span class="metric-label">Emergency</span>
+            <strong>{{ counts.emergency }}</strong>
+            <span class="metric-note">Active priority cases</span>
+        </article>
+        <article class="metric metric-consultation">
+            <span class="metric-label">In consultation</span>
+            <strong>{{ counts.in_consultation }}</strong>
+            <span class="metric-note">Currently being seen</span>
+        </article>
+        <article class="metric metric-completed">
+            <span class="metric-label">Completed</span>
+            <strong>{{ counts.completed }}</strong>
+            <span class="metric-note">Visits completed</span>
+        </article>
+    </section>
+
+    {% if patient %}
+        <section class="detail-panel" aria-labelledby="detail-title">
+            <div class="section-heading">
+                <div><p class="eyebrow">Patient record</p><h2 id="detail-title">{{ patient.patient_name }}</h2></div>
+                <a class="text-link" href="{{ url_for('home') }}">Back to dashboard</a>
+            </div>
+            <dl class="detail-grid">
+                <div><dt>Patient ID</dt><dd>{{ patient.patient_id }}</dd></div>
+                <div><dt>Age / gender</dt><dd>{{ patient.age }} / {{ patient.gender }}</dd></div>
+                <div><dt>Department</dt><dd>{{ patient.department }}</dd></div>
+                <div><dt>Contact</dt><dd>{{ patient.contact_number or 'Not provided' }}</dd></div>
+                <div><dt>Priority</dt><dd>{{ patient.priority_level }}</dd></div>
+                <div><dt>Status</dt><dd>{{ patient.status }}</dd></div>
+                <div class="detail-wide"><dt>Reason for visit</dt><dd>{{ patient.symptoms }}</dd></div>
+            </dl>
+        </section>
+    {% endif %}
+
+    <div class="workspace-grid">
+        <section class="registration-panel" aria-labelledby="registration-title">
+            <div class="section-heading">
+                <div><p class="eyebrow">New visit</p><h2 id="registration-title">Register patient</h2></div>
+                <span class="required-note">* Required</span>
+            </div>
+            <form id="patient-form" action="{{ url_for('register_patient') }}" method="post" novalidate>
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <div class="form-field">
+                    <label for="patient_name">Patient name <span>*</span></label>
+                    <input id="patient_name" name="patient_name" type="text" maxlength="100" autocomplete="name" value="{{ form_values.get('patient_name', '') }}" aria-invalid="{{ 'true' if form_errors.get('patient_name') else 'false' }}" required>
+                    <small class="field-error" aria-live="polite">{{ form_errors.get('patient_name', '') }}</small>
+                </div>
+                <div class="form-row">
+                    <div class="form-field">
+                        <label for="age">Age <span>*</span></label>
+                        <input id="age" name="age" type="number" min="1" max="120" inputmode="numeric" value="{{ form_values.get('age', '') }}" aria-invalid="{{ 'true' if form_errors.get('age') else 'false' }}" required>
+                        <small class="field-error" aria-live="polite">{{ form_errors.get('age', '') }}</small>
+                    </div>
+                    <div class="form-field">
+                        <label for="gender">Gender <span>*</span></label>
+                        <select id="gender" name="gender" aria-invalid="{{ 'true' if form_errors.get('gender') else 'false' }}" required>
+                            <option value="">Select</option>
+                            {% for gender_option in ['Female', 'Male', 'Other', 'Prefer not to say'] %}
+                                <option value="{{ gender_option }}" {% if form_values.get('gender') == gender_option %}selected{% endif %}>{{ gender_option }}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="field-error" aria-live="polite">{{ form_errors.get('gender', '') }}</small>
+                    </div>
+                </div>
+                <div class="form-field">
+                    <label for="contact_number">Contact number <span class="optional">Optional</span></label>
+                    <input id="contact_number" name="contact_number" type="tel" maxlength="30" autocomplete="tel" value="{{ form_values.get('contact_number', '') }}" aria-invalid="{{ 'true' if form_errors.get('contact_number') else 'false' }}">
+                    <small class="field-error" aria-live="polite">{{ form_errors.get('contact_number', '') }}</small>
+                </div>
+                <div class="form-field">
+                    <label for="department">Department <span>*</span></label>
+                    <select id="department" name="department" aria-invalid="{{ 'true' if form_errors.get('department') else 'false' }}" required>
+                        <option value="">Choose a department</option>
+                        {% for department_option in departments %}
+                            <option value="{{ department_option }}" {% if form_values.get('department') == department_option %}selected{% endif %}>{{ department_option }}</option>
+                        {% endfor %}
+                    </select>
+                    <small class="field-error" aria-live="polite">{{ form_errors.get('department', '') }}</small>
+                </div>
+                <div class="form-field">
+                    <label for="symptoms">Reason for visit <span>*</span></label>
+                    <textarea id="symptoms" name="symptoms" rows="3" maxlength="5000" aria-invalid="{{ 'true' if form_errors.get('symptoms') else 'false' }}" required>{{ form_values.get('symptoms', '') }}</textarea>
+                    <small class="field-error" aria-live="polite">{{ form_errors.get('symptoms', '') }}</small>
+                </div>
+                <fieldset class="priority-fieldset">
+                    <legend>Priority <span>*</span></legend>
+                    <div class="priority-options">
+                        {% for priority_option in ['Emergency', 'Urgent', 'Normal'] %}
+                            <label class="priority-choice priority-choice-{{ priority_option|lower }}"><input type="radio" name="priority_level" value="{{ priority_option }}" {% if form_values.get('priority_level') == priority_option %}checked{% endif %} required><span>{{ priority_option }}</span></label>
+                        {% endfor %}
+                    </div>
+                    <small class="field-error" data-error-for="priority_level" aria-live="polite">{{ form_errors.get('priority_level', '') }}</small>
+                    <small class="priority-note">Priority is selected by staff for this demonstration.</small>
+                </fieldset>
+                <button class="primary-button" type="submit"><span aria-hidden="true">+</span> Add to queue</button>
+            </form>
+        </section>
+
+        <section class="queue-panel" aria-labelledby="queue-title">
+            <div class="section-heading queue-heading">
+                <div><p class="eyebrow">Currently active</p><h2 id="queue-title">Active roster</h2></div>
+                <span class="queue-count">{{ counts.active }} patients</span>
+            </div>
+            <form class="queue-filters" action="{{ url_for('home') }}" method="get">
+                <label class="filter-field" for="department-filter">
+                    <span>Department</span>
+                    <select id="department-filter" name="department">
+                        <option value="">All departments</option>
+                        {% for department_option in departments %}
+                            <option value="{{ department_option }}" {% if department == department_option %}selected{% endif %}>{{ department_option }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label class="filter-field filter-search" for="queue-search">
+                    <span>Search patients</span>
+                    <input id="queue-search" name="search" type="search" maxlength="100" value="{{ search }}" placeholder="Name or patient ID">
+                </label>
+                <button class="filter-button" type="submit">Apply filters</button>
+                {% if department or search %}<a class="clear-filters" href="{{ url_for('home') }}">Clear</a>{% endif %}
+            </form>
+            {% for field_name, error_message in filter_errors.items() %}
+                <p class="notice notice-error filter-error" role="alert">{{ error_message }}</p>
+            {% endfor %}
+            {% if patients %}
+                <div class="table-scroll">
+                    <table class="queue-table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Queue</th>
+                                <th scope="col">Patient</th>
+                                <th scope="col">Department</th>
+                                <th scope="col">Priority</th>
+                                <th scope="col">Registered</th>
+                                <th scope="col">Status</th>
+                                <th scope="col">Update</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for queued_patient in patients %}
+                                <tr>
+                                    <td><span class="queue-number">{{ queued_patient.queue_number }}</span></td>
+                                    <td>
+                                        <a class="patient-link" href="{{ url_for('patient_details', patient_id=queued_patient.patient_id) }}">{{ queued_patient.patient_name }}</a>
+                                        <small class="patient-id">ID {{ queued_patient.patient_id }}</small>
+                                    </td>
+                                    <td>{{ queued_patient.department }}</td>
+                                    <td><span class="priority-badge priority-{{ queued_patient.priority_level|lower|replace(' ', '-') }}">{{ queued_patient.priority_level }}</span></td>
+                                    <td class="registered-time">{{ queued_patient.registered_at.strftime('%b %d, %Y %I:%M %p') }}</td>
+                                    <td><span class="status-badge status-{{ queued_patient.status|lower|replace(' ', '-') }}">{{ queued_patient.status }}</span></td>
+                                    <td>
+                                        <form class="status-form" action="{{ url_for('update_patient_status', patient_id=queued_patient.patient_id) }}" method="post">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                            <label class="visually-hidden" for="status-{{ queued_patient.patient_id }}">Update status for {{ queued_patient.patient_name }}</label>
+                                            <select id="status-{{ queued_patient.patient_id }}" name="status">
+                                                {% for status_option in ['Waiting', 'In Consultation', 'Completed'] %}
+                                                    <option value="{{ status_option }}" {% if queued_patient.status == status_option %}selected{% endif %}>{{ status_option }}</option>
+                                                {% endfor %}
+                                            </select>
+                                            <button class="update-button" type="submit">Save</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <span class="empty-mark" aria-hidden="true">0</span>
+                    <h3>{% if department or search %}No matching patients{% else %}The queue is clear{% endif %}</h3>
+                    <p>{% if department or search %}Try another search or choose a different department.{% else %}New registrations will appear here, ordered by staff-selected priority and registration time.{% endif %}</p>
+                </div>
+            {% endif %}
+        </section>
+    </div>
+</div>
+{% endblock %}
